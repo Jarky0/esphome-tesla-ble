@@ -1,22 +1,25 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import ble_client, binary_sensor
+from esphome.components import ble_client, binary_sensor, web_server_base
 from esphome.const import CONF_ID
 
 CODEOWNERS = ["@yoziru"]
-DEPENDENCIES = ["ble_client"]
+DEPENDENCIES = ["ble_client", "web_server_base"]
+LIBRARIES = ["ESP Async WebServer=esphome/ESPAsyncWebServer-esphome@2.1.0"]
 
 tesla_ble_vehicle_ns = cg.esphome_ns.namespace("tesla_ble_vehicle")
 TeslaBLEVehicle = tesla_ble_vehicle_ns.class_(
     "TeslaBLEVehicle", cg.PollingComponent, ble_client.BLEClientNode
 )
 
-AUTO_LOAD = ["binary_sensor"]
+AUTO_LOAD = ["binary_sensor", "web_server"]
 CONF_VIN = "vin"
 CONF_IS_ASLEEP = "is_asleep"
 CONF_IS_UNLOCKED = "is_unlocked"
 CONF_IS_USER_PRESENT = "is_user_present"
 CONF_IS_CHARGE_FLAP_OPEN = "is_charge_flap_open"
+CONF_ENABLE_HTTP_PROXY = "enable_http_proxy"
+CONF_HTTP_PROXY_PORT = "http_proxy_port"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -36,6 +39,8 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_IS_CHARGE_FLAP_OPEN): binary_sensor.binary_sensor_schema(
                 icon="mdi:ev-plug-tesla", device_class=binary_sensor.DEVICE_CLASS_DOOR
             ).extend(),
+            cv.Optional(CONF_ENABLE_HTTP_PROXY, default=False): cv.boolean,
+            cv.Optional(CONF_HTTP_PROXY_PORT, default=8899): cv.port,
         }
     )
     .extend(cv.polling_component_schema("1min"))
@@ -50,6 +55,10 @@ async def to_code(config):
     await ble_client.register_ble_node(var, config)
 
     cg.add(var.set_vin(config[CONF_VIN]))
+
+    if config[CONF_ENABLE_HTTP_PROXY]:
+        cg.add(var.set_http_proxy_enabled(True))
+        cg.add(var.set_http_proxy_port(config[CONF_HTTP_PROXY_PORT]))
 
     if CONF_IS_ASLEEP in config:
         conf = config[CONF_IS_ASLEEP]

@@ -18,6 +18,9 @@
 #include <vcsec.pb.h>
 #include <errors.h>
 
+// Add include for AsyncWebServer
+#include <ESPAsyncWebServer.h>
+
 #include "custom_binary_sensor.h"
 
 namespace TeslaBLE
@@ -190,6 +193,10 @@ namespace esphome
                 isUserPresentSensor->set_has_state(has_state);
             }
 
+            // Add setters for HTTP proxy config
+            void set_http_proxy_enabled(bool enabled);
+            void set_http_proxy_port(uint16_t port);
+
         protected:
             std::queue<BLERXChunk> ble_read_queue_;
             std::queue<BLEResponse> response_queue_;
@@ -211,6 +218,11 @@ namespace esphome
             binary_sensor::CustomBinarySensor *isUnlockedSensor;
             binary_sensor::CustomBinarySensor *isUserPresentSensor;
             binary_sensor::CustomBinarySensor *isChargeFlapOpenSensor;
+
+            // Add member variables for HTTP proxy
+            bool http_proxy_enabled_{false};
+            uint16_t http_proxy_port_{8899};
+            AsyncWebServer *http_server_{nullptr};
 
             std::vector<unsigned char> ble_read_buffer_;
 

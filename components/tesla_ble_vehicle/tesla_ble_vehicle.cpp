@@ -19,6 +19,9 @@
 #include "log.h"
 #include "tesla_ble_vehicle.h"
 
+// Add include for ESPAsyncWebServer - needed here as well for implementation
+#include <ESPAsyncWebServer.h>
+
 namespace esphome
 {
   namespace tesla_ble_vehicle
@@ -44,6 +47,23 @@ namespace esphome
       this->openNVSHandle();
       this->initializePrivateKey();
       this->loadSessionInfo();
+
+      // Initialize and start the HTTP server if enabled
+      if (this->http_proxy_enabled_) {
+        ESP_LOGCONFIG(TAG, "Starting HTTP Proxy on port %d", this->http_proxy_port_);
+        this->http_server_ = new AsyncWebServer(this->http_proxy_port_);
+        // TODO: Register HTTP handlers here
+
+        // Example handler (remove later)
+        this->http_server_->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+            request->send(200, "text/plain", "Hello from esphome-tesla-ble!");
+        });
+
+        this->http_server_->begin();
+        ESP_LOGCONFIG(TAG, "HTTP Proxy started.");
+      } else {
+        ESP_LOGCONFIG(TAG, "HTTP Proxy disabled.");
+      }
     }
 
     void TeslaBLEVehicle::initializeFlash()
@@ -234,7 +254,8 @@ namespace esphome
           if (current_command.retry_count > MAX_RETRIES)
           {
             ESP_LOGE(TAG, "[%s] Failed to wake vehicle after %d retries",
-                     current_command.execute_name.c_str(), MAX_RETRIES);
+                     current_command.execute_name.c_str(),
+                     MAX_RETRIES);
             // pop command
             command_queue_.pop();
           }
@@ -1663,5 +1684,15 @@ namespace esphome
         break;
       }
     }
+
+    // --- Add setter implementations for HTTP proxy ---
+    void TeslaBLEVehicle::set_http_proxy_enabled(bool enabled) {
+      this->http_proxy_enabled_ = enabled;
+    }
+
+    void TeslaBLEVehicle::set_http_proxy_port(uint16_t port) {
+      this->http_proxy_port_ = port;
+    }
+    // --- End of setter implementations ---
   } // namespace tesla_ble_vehicle
 } // namespace esphome
