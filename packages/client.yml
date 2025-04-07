@@ -20,6 +20,9 @@ tesla_ble_vehicle:
     name: "Doors"
   is_charge_flap_open:
     name: "Charge flap"
+  private_key: !secret tesla_private_key_b64
+  http_proxy_enabled: True
+  http_proxy_port: 8899 # Adjust port if needed
 
 button:
   - platform: template
@@ -51,6 +54,18 @@ button:
       - lambda: id(tesla_ble_vehicle_id)->enqueueVCSECInformationRequest(true);
     entity_category: diagnostic
 
+  - platform: template
+    name: "Honk"
+    id: honk_button
+    on_press:
+      lambda: 'id(tesla_ble_vehicle_id).queue_command((UniversalMessage_Domain)2, "honk_horn");' # Infotainment = 2
+
+  - platform: template
+    name: "Wake Up"
+    id: wake_up_button
+    on_press:
+      lambda: 'id(tesla_ble_vehicle_id).queue_command((UniversalMessage_Domain)1, "wake_up");' # VCSEC = 1
+
 sensor:
   - platform: ble_client
     type: rssi
@@ -61,51 +76,60 @@ sensor:
     entity_category: diagnostic
 
 switch:
-  - platform: template
-    name: "Charger switch"
-    optimistic: true
-    assumed_state: true # we can't read the state of the charger over
-    restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_SWITCH, 1);
-    turn_off_action:
-      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_SWITCH, 0);
-
   - platform: ble_client
     ble_client_id: ble_tesla_id
     name: "BLE Connection"
     entity_category: diagnostic
 
+  - platform: template
+    name: "Charge Switch"
+    id: charge_switch
+    # Assuming charge start/stop is infotainment domain (check TeslaBLE docs)
+    # Use integer value for domain: UniversalMessage_Domain_DOMAIN_INFOTAINMENT = 2
+    turn_on_action:
+      lambda: 'id(tesla_ble_vehicle_id).queue_command((UniversalMessage_Domain)2, "start_charging");'
+    turn_off_action:
+      lambda: 'id(tesla_ble_vehicle_id).queue_command((UniversalMessage_Domain)2, "stop_charging");'
+
 number:
   - platform: template
-    name: "Charging amps"
+    name: "Charging Amps"
     id: charging_amps
-    icon: mdi:ev-station
-    unit_of_measurement: "A"
-    mode: slider
-    min_value: 0
-    max_value: $charging_amps_max
+    min_value: 0 # Check min/max based on Tesla capabilities
+    max_value: 32 # Check min/max based on Tesla capabilities
     step: 1
-    optimistic: true
-    restore_value: true
-    on_value:
-      then:
-        - lambda: |-
-            int var_x = static_cast<int>(x);
-            id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_AMPS, var_x);
+    unit_of_measurement: "A"
+    mode: box
+    # Assuming set amps is infotainment domain (check TeslaBLE docs)
+    # Use integer value for domain: UniversalMessage_Domain_DOMAIN_INFOTAINMENT = 2
+    set_action:
+      # TODO: The set_charging_amps command likely needs the value (x) passed.
+      # The queue_command needs to be adapted or a new specific method added.
+      # Placeholder for now:
+      lambda: 'ESP_LOGW("set_amps", "Setting amps via lambda not fully implemented yet. Value: %f", x); id(tesla_ble_vehicle_id).queue_command((UniversalMessage_Domain)2, "set_charging_amps");'
+
   - platform: template
-    name: "Charging limit"
-    id: charging_limit
-    icon: mdi:ev-station
+    name: "Charge Limit"
+    id: charge_limit
+    min_value: 50 # Common min limit
+    max_value: 100 # Max limit
+    step: 1
     unit_of_measurement: "%"
     mode: slider
-    min_value: 50
-    max_value: 100
-    step: 1
-    optimistic: true
-    restore_value: true
-    on_value:
-      then:
-        - lambda: |-
-            int var_x = static_cast<int>(x);
-            id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_LIMIT, var_x);
+    # Assuming set limit is infotainment domain (check TeslaBLE docs)
+    # Use integer value for domain: UniversalMessage_Domain_DOMAIN_INFOTAINMENT = 2
+    set_action:
+      # TODO: The set_charge_limit command likely needs the value (x) passed.
+      # The queue_command needs to be adapted or a new specific method added.
+      # Placeholder for now:
+      lambda: 'ESP_LOGW("set_limit", "Setting limit via lambda not fully implemented yet. Value: %f", x); id(tesla_ble_vehicle_id).queue_command((UniversalMessage_Domain)2, "set_charge_limit");'
+
+lock:
+  - platform: template
+    name: "Doors"
+    id: door_lock
+    # RKE actions are VCSEC domain = 1
+    lock_action:
+      lambda: 'id(tesla_ble_vehicle_id).queue_rke_action((VCSEC_RKEAction_E)0, "lock");' # LOCK = 0
+    unlock_action:
+      lambda: 'id(tesla_ble_vehicle_id).queue_rke_action((VCSEC_RKEAction_E)1, "unlock");' # UNLOCK = 1

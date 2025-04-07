@@ -19,6 +19,7 @@ esphome:
     version: "2024.8.1"
   libraries:
     - https://github.com/yoziru/tesla-ble.git#v2.2.1
+    # - https://github.com/nanopb/nanopb.git#0.4.8
 
 logger:
   level: INFO
